@@ -14,24 +14,9 @@ public class ReceiverBoot extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.i("InfoS", "Start service");
-        Intent alarmIntent = new Intent(context, ReceiverService.class);
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(context, 0, alarmIntent, 0);
+        Log.i("Gymbildschirm", "ReceiverBoot.onReceive");
+        JobUtil.scheduleJob(context);
 
-        AlarmManager manager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        int interval = 10 * 60000;
-
-        manager.setRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), interval, pendingIntent);
-
-    }
-
-    public static class ReceiverService extends  BroadcastReceiver {
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            Log.i("Info","ReceiverService onReceive");
-            context.startService(new Intent(context, MyService.class));
-        }
     }
 
 }

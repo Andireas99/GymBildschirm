@@ -2,7 +2,6 @@ package com.bur.andi.gymbildschirm;
 
 import android.content.Context;
 import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.os.AsyncTask;
 import android.util.Log;
 import android.widget.Toast;
@@ -25,19 +24,17 @@ public class CodeTask extends AsyncTask<String, Void, String> {
     String ganzerCodeL;
     boolean websiteError = false;
 
-    private CodeTaskFinish listener;
+    private CodeTaskDone listener;
     public Context mContext;
 
-    public CodeTask(CodeTaskFinish listener, Context context) {
+    public CodeTask(CodeTaskDone listener, Context context) {
         this.listener = listener;
         this.mContext = context;
     }
 
     public boolean isOnline() {
-        ConnectivityManager cm =
-                (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo netInfo = cm.getActiveNetworkInfo();
-        return netInfo != null && netInfo.isConnectedOrConnecting();
+        ConnectivityManager cm = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+        return cm.getActiveNetworkInfo() != null && cm.getActiveNetworkInfo().isConnected();
     }
 
     @Override
@@ -46,10 +43,10 @@ public class CodeTask extends AsyncTask<String, Void, String> {
             return null;
         }
         try {
+
             String url = "https://sal.portal.bl.ch/gymow/dview/showterminliste.php?id=6zfgfbejsdtwgv3hcuwegujdbg";
             ganzerCodeL = getUrlSource(url);
         } catch (IOException e) {
-
             e.printStackTrace();
         }
         return ganzerCodeL;
@@ -60,7 +57,7 @@ public class CodeTask extends AsyncTask<String, Void, String> {
         if(websiteError){
             Toast.makeText(mContext,"Website Error!",Toast.LENGTH_LONG).show();
         }
-        listener.codeTaskFinished(ganzerCodeL);
+        listener.codeTaskDone(ganzerCodeL);
     }
 
     @Override
@@ -87,11 +84,12 @@ public class CodeTask extends AsyncTask<String, Void, String> {
         HttpResponse response = httpclient.execute(httpget);
         HttpEntity entity = response.getEntity();
         InputStream is = entity.getContent();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(is, "iso-8859-1"), 8);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(is, "utf-8"));
         StringBuilder sb = new StringBuilder();
-        String line = "";
-        while ((line = reader.readLine()) != null)
+        String line;
+        while ((line = reader.readLine()) != null){
             sb.append(line).append("\n");
+        }
 
         String resString = sb.toString();
 

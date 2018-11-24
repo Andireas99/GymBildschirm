@@ -3,6 +3,7 @@ package com.bur.andi.gymbildschirm;
 import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
@@ -33,25 +34,23 @@ import java.util.Collections;
 import java.util.Random;
 
 
-public class MainActivity extends AppCompatActivity implements CodeTaskFinish {
+public class MainActivity extends AppCompatActivity implements CodeTaskDone {
 
     Toolbar toolbar;
     ViewPager pager;
     ViewPagerAdapter viewAdapter;
     SlidingTabLayout tabs;
-    CharSequence Titles[] = {"Nachrichten", "Log"};
-    int Numboftabs = 2;
+    CharSequence tabsTitles[] = {"Nachrichten", "Log"};
 
-    private final String path = "Old_Messages.txt";
-    private final String pathLog = "Log_Messages.txt";
+    private final String CURRENT_MESSAGES_PATH = "Old_Messages.txt";
+    private final String LOG_MESSAGES_PATH = "Log_Messages.txt";
 
-    private PendingIntent pendingIntent;
     static Context mContext;
 
     public static ArrayList messagesList;
     public static ArrayList logList;
 
-    public static CodeTaskFinish codeTaskListener;
+    public static CodeTaskDone codeTaskDoneListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,15 +61,15 @@ public class MainActivity extends AppCompatActivity implements CodeTaskFinish {
         messagesList = new ArrayList() {};
         logList = new ArrayList() {};
 
-        toolbar = (Toolbar) findViewById(R.id.tool_bar);
+        toolbar = findViewById(R.id.tool_bar);
         setSupportActionBar(toolbar);
 
-        viewAdapter = new ViewPagerAdapter(getSupportFragmentManager(), Titles, Numboftabs);
+        viewAdapter = new ViewPagerAdapter(getSupportFragmentManager(), tabsTitles, tabsTitles.length);
 
-        pager = (ViewPager) findViewById(R.id.pager);
+        pager = findViewById(R.id.pager);
         pager.setAdapter(viewAdapter);
 
-        tabs = (SlidingTabLayout) findViewById(R.id.tabs);
+        tabs = findViewById(R.id.tabs);
         tabs.setDistributeEvenly(true);
 
         tabs.setCustomTabColorizer(new SlidingTabLayout.TabColorizer() {
@@ -82,15 +81,12 @@ public class MainActivity extends AppCompatActivity implements CodeTaskFinish {
 
         tabs.setViewPager(pager);
 
-        mContext = this;
+        mContext = getApplicationContext();
 
         Activity activity = this;
-        codeTaskListener = (CodeTaskFinish) activity;
+        codeTaskDoneListener = (CodeTaskDone) activity;
 
-        Intent alarmIntent = new Intent(this, ReceiverBoot.class);
-        pendingIntent = PendingIntent.getBroadcast(this, 0, alarmIntent, 0);
-
-        startService();
+        startBootReceiver();
 
         runCodeTask();
     }
@@ -109,33 +105,35 @@ public class MainActivity extends AppCompatActivity implements CodeTaskFinish {
 
         if (id == R.id.action_settings) {
             Log.i("Info", "Einstellungen");
-            Toast.makeText(this,"Noch keine Einstellungen",Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Noch keine Einstellungen", Toast.LENGTH_SHORT).show();
             return true;
         }
 
         return super.onOptionsItemSelected(item);
     }
 
-    public void startService() {
-        Log.i("Info", "startService");
-        AlarmManager manager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+    public void startBootReceiver() {
+        Log.i("Info", "startBootReceiver");
 
+        Intent bootReceiverIntent = new Intent(this, ReceiverBoot.class);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, bootReceiverIntent, 0);
+
+        AlarmManager manager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         manager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), pendingIntent);
     }
 
     public void split(String GanzerCode) {
         Log.i("Info", "split");
 
-        if(GanzerCode==null){
+        if (GanzerCode == null) {
             String[] messages = readFile();
-            if(messagesList!=null){
+            if (messagesList != null) {
                 messagesList.clear();
             }
-            for(String message : messages){
-                Log.i("GymBildschirm",message);
+            for (String message : messages) {
+                Log.i("GymBildschirm", message);
                 messagesList.add(getMessageString(message));
             }
-            //addMessageToTab();
             return;
         }
 
@@ -269,7 +267,7 @@ public class MainActivity extends AppCompatActivity implements CodeTaskFinish {
         String zeit = "";
         String betreff = "";
 
-        Log.i("Info","input: "+input);
+        Log.i("Info", "input: " + input);
 
         if (!daten[4].isEmpty()) {
             betreff = "<b>BETREFF:</b> " + daten[4];
@@ -291,9 +289,9 @@ public class MainActivity extends AppCompatActivity implements CodeTaskFinish {
             zeit = "<b>ZEIT:</b> Bis um " + daten[3] + " ";
         }
 
-        if(daten.length<6){
+        if (daten.length < 6) {
             output = "<html>" + betreff + "<br>" + datum + "<br>" + zeit + "</html>";
-        }else{
+        } else {
             output = "<html>" + betreff + "<br>" + datum + "<br>" + zeit + "<br>" + daten[5] + "</html>";
         }
 
@@ -312,7 +310,6 @@ public class MainActivity extends AppCompatActivity implements CodeTaskFinish {
         Tab1.swipeContainer.setRefreshing(false);
 
 
-
         Tab2.adapter.clear();
         final FragmentTransaction ft2 = getSupportFragmentManager().beginTransaction();
         ft2.detach(ViewPagerAdapter.tab2);
@@ -327,7 +324,7 @@ public class MainActivity extends AppCompatActivity implements CodeTaskFinish {
         ArrayList<String> messagesList = new ArrayList<>();
 
         try {
-            InputStream inputStream = this.openFileInput(path);
+            InputStream inputStream = this.openFileInput(CURRENT_MESSAGES_PATH);
 
             if (inputStream != null) {
                 InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
@@ -365,35 +362,35 @@ public class MainActivity extends AppCompatActivity implements CodeTaskFinish {
         ArrayList<String> logList = new ArrayList<>();
 
         try {
-            InputStream inputStream = this.openFileInput(pathLog);
+            InputStream inputStream = this.openFileInput(LOG_MESSAGES_PATH);
 
             if (inputStream != null) {
                 InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
                 BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
                 String receiveString;
 
-                if(returnPlain){
+                if (returnPlain) {
                     ArrayList<String> plainList = new ArrayList<>();
                     while ((receiveString = bufferedReader.readLine()) != null) {
                         plainList.add(receiveString);
                     }
                     String[] plainOutput = new String[plainList.size()];
-                    for(int i = 0; i < plainList.size(); i++){
-                        plainOutput[i] = plainList.get(i).replaceAll("&nbsp ","");
+                    for (int i = 0; i < plainList.size(); i++) {
+                        plainOutput[i] = plainList.get(i).replaceAll("&nbsp ", "");
                     }
                     return plainOutput;
                 }
 
                 while ((receiveString = bufferedReader.readLine()) != null) {
-                    if(receiveString.split("\\|").length==2){
-                        Log.i("Info","logList getMessageString");
+                    if (receiveString.split("\\|").length == 2) {
+                        Log.i("Info", "logList getMessageString");
                         logList.add("<html><b>Empfangen: </b>" + receiveString.split("\\|")[0] + "<br></html>" + getMessageString(receiveString.split("\\|")[1]));
-                    }else{
-                        logList.add("<html><b>ERROR</b><br></html>"+receiveString);
-                        Log.e("Log Error",receiveString);
+                    } else {
+                        logList.add("<html><b>ERROR</b><br></html>" + receiveString);
+                        Log.e("Log Error", receiveString);
                         //Toast.makeText(this,"Log Fehler",Toast.LENGTH_SHORT).show();
                     }
- 
+
                 }
                 if (logList.size() == 0) {
                     Log.e("Error", "Keine Log Inhalt");
@@ -403,7 +400,7 @@ public class MainActivity extends AppCompatActivity implements CodeTaskFinish {
                 inputStream.close();
 
                 Log.i("Info", "read log done");
-            }else{
+            } else {
                 return new String[0];
             }
         } catch (FileNotFoundException e) {
@@ -423,7 +420,7 @@ public class MainActivity extends AppCompatActivity implements CodeTaskFinish {
     public void writeFile(String[] messages) {
         OutputStreamWriter out = null;
         try {
-            out = new OutputStreamWriter(this.openFileOutput(path, Context.MODE_PRIVATE));
+            out = new OutputStreamWriter(this.openFileOutput(CURRENT_MESSAGES_PATH, Context.MODE_PRIVATE));
 
             String output = "";
             for (String message : messages) {
@@ -455,12 +452,12 @@ public class MainActivity extends AppCompatActivity implements CodeTaskFinish {
 
         OutputStreamWriter out = null;
         try {
-            out = new OutputStreamWriter(this.openFileOutput(pathLog, Context.MODE_PRIVATE));
+            out = new OutputStreamWriter(this.openFileOutput(LOG_MESSAGES_PATH, Context.MODE_PRIVATE));
 
             for (String message : newMessages) {
                 out.write(time + " |" + message + "\n");
             }
-            for(String message : oldMessages){
+            for (String message : oldMessages) {
                 out.write(message + "\n");
             }
 
@@ -476,39 +473,46 @@ public class MainActivity extends AppCompatActivity implements CodeTaskFinish {
         }
     }
 
-    public void showNotification(String Titel, String Nachricht) {
+    public void showNotification(String title, String message) {
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pi = PendingIntent.getActivity(this, 0, notificationIntent, 0);
 
-        Notification notification = new Builder(this, "")
-                .setTicker(Titel)
+        String id = "gymbildschirm_channel_1";
+
+        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+
+        NotificationChannel mChannel = new NotificationChannel(id, "Gymbildschirm Channel",NotificationManager.IMPORTANCE_DEFAULT);
+        mChannel.enableLights(true);
+
+        notificationManager.createNotificationChannel(mChannel);
+
+        Notification notification = new Builder(getApplicationContext(), id)
+                .setTicker(title)
                 .setSmallIcon(android.R.drawable.ic_menu_report_image)
-                .setContentTitle(formatToParts(Nachricht)[0])
+                .setContentTitle(formatToParts(message)[0])
                 .setContentIntent(pi)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(formatToParts(Nachricht)[0] + "\n" + formatToParts(Nachricht)[1]))
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(formatToParts(message)[0] + "\n" + formatToParts(message)[1]))
                 .setAutoCancel(true)
                 .build();
 
-        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+
         Random random = new Random();
         int m = random.nextInt(9999 - 1000) + 1000;
         notificationManager.notify(m, notification);
     }
 
     public static void runCodeTask() {
-        new CodeTask(new CodeTaskFinish() {
+        new CodeTask(new CodeTaskDone() {
             @Override
-            public void codeTaskFinished(String output) {
-                Log.i("Info", "Alarm done");
-                codeTaskListener.codeTaskFinished(output);
+            public void codeTaskDone(String output) {
+                codeTaskDoneListener.codeTaskDone(output);
             }
-
-        },mContext).execute("");
+        }, mContext).execute("");
     }
 
     @Override
-    public void codeTaskFinished(String output) {
-        Log.i("Info", "codeTaskFinished");
+    public void codeTaskDone(String output) {
+        Log.i("Info", "codeTaskDone");
         split(output);
     }
 
