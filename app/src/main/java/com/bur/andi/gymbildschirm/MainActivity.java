@@ -122,10 +122,10 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
         manager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), pendingIntent);
     }
 
-    public void split(String GanzerCode) {
+    public void split(String ganzerCode) {
         Log.i("Info", "split");
 
-        if (GanzerCode == null) {
+        if (ganzerCode == null) {
             String[] messages = readFile();
             if (messagesList != null) {
                 messagesList.clear();
@@ -142,7 +142,7 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
         String[][] daten;
         int anzahl = 0;
 
-        codes = GanzerCode.split("<tr>|</table>");
+        codes = ganzerCode.split("<tr>|</table>");
 
         for (int i = 0; i < codes.length - 1; i++) {
             if (codes[i] != null) {
@@ -162,7 +162,7 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
 
         for (int a = 0; a < anzahl - 1; a++) {
             for (int b = 2; bb < 6; b = b + 2) {
-                daten[a][bb] = codes2[a][b];
+                daten[a][bb] = codes2[a][b].trim();
                 bb++;
             }
             bb = 0;

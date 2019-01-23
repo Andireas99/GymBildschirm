@@ -56,21 +56,21 @@ public class MyService extends JobIntentService implements CodeTaskDone {
     public void codeTaskDone(String output) {
     }
 
-    public void split(String GanzerCode) {
+    public void split(String ganzerCode) {
         Log.i("InfoSE", "split");
 
-        if (GanzerCode == null) {
+        if (ganzerCode == null) {
             return;
         }
 
-        GanzerCode = GanzerCode.replaceAll("&nbsp;?", "");
+        ganzerCode = ganzerCode.replaceAll("&nbsp;?", "");
 
         String[] codes;
         String[][] codes2;
         String[][] daten;
         int anzahl = 0;
 
-        codes = GanzerCode.split("<tr>|</table>");
+        codes = ganzerCode.split("<tr>|</table>");
 
         for (int i = 0; i < codes.length - 1; i++) {
             if (codes[i] != null) {
@@ -89,7 +89,7 @@ public class MyService extends JobIntentService implements CodeTaskDone {
 
         for (int a = 0; a < anzahl - 1; a++) {
             for (int b = 2; bb < 6; b = b + 2) {
-                daten[a][bb] = codes2[a][b];
+                daten[a][bb] = codes2[a][b].trim();
                 bb++;
             }
             bb = 0;
@@ -257,7 +257,6 @@ public class MyService extends JobIntentService implements CodeTaskDone {
             String output = "";
             for (String message : messages) {
                 output = output + message + "\n";
-
             }
             out.write(output);
 
@@ -304,7 +303,6 @@ public class MyService extends JobIntentService implements CodeTaskDone {
                     } else {
                         logList.add("<html><b>ERROR</b><br></html>" + receiveString);
                         Log.e("Log Error", receiveString);
-                        //Toast.makeText(this,"Log Fehler",Toast.LENGTH_SHORT).show();
                     }
 
                 }
