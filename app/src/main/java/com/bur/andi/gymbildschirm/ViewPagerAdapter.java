@@ -1,66 +1,90 @@
 package com.bur.andi.gymbildschirm;
 
-import android.content.Context;
+import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentStatePagerAdapter;
+import android.support.v4.app.FragmentTransaction;
 import android.util.Log;
-
-import static android.app.PendingIntent.getActivity;
 
 /**
  * Created by hp1 on 21-01-2015.
+ * Modified by Andi
  */
 public class ViewPagerAdapter extends FragmentStatePagerAdapter {
 
-    static Tab1 tab1;
-    static Tab2 tab2;
+    private Tab1 tab1;
+    private Tab2 tab2;
 
-    CharSequence Titles[]; // This will Store the tabsTitles of the Tabs which are Going to be passed when ViewPagerAdapter is created
-    int NumbOfTabs; // Store the number of tabs, this will also be passed when the ViewPagerAdapter is created
+    private CharSequence titles[];
+    private int numbOfTabs;
 
+    private FragmentManager manager;
+    private RefreshListener listener;
 
-    // Build a Constructor and assign the passed Values to appropriate values in the class
-    public ViewPagerAdapter(FragmentManager fm, CharSequence mTitles[], int mNumbOfTabsumb) {
+    ViewPagerAdapter(FragmentManager fm, RefreshListener listener, CharSequence mTitles[], int mNumbOfTabs) {
         super(fm);
 
-        this.Titles = mTitles;
-        this.NumbOfTabs = mNumbOfTabsumb;
-
+        manager = fm;
+        this.listener = listener;
+        this.titles = mTitles;
+        this.numbOfTabs = mNumbOfTabs;
     }
 
-    //This method return the fragment for the every position in the View Pager
     @Override
     public Fragment getItem(int position) {
 
-        if(position == 0) // if the position is 0 we are returning the First tab
-        {
+        Bundle bundle = new Bundle();
+        bundle.putParcelable("refreshListener", listener);
 
-            Log.i("Info","ViewPagerAdapter Tab1");
+        if (position == 0) {
+            Log.i("Info", "ViewPagerAdapter Tab1");
             tab1 = new Tab1();
+            tab1.setArguments(bundle);
             return tab1;
-        }
-        else             // As we are having 2 tabs if the position is now 0 it must be 1 so we are returning second tab
-        {
-            Log.i("Info","ViewPagerAdapter Tab2");
+        } else {
+            Log.i("Info", "ViewPagerAdapter Tab2");
             tab2 = new Tab2();
+            tab2.setArguments(bundle);
             return tab2;
         }
-
-
     }
 
-    // This method return the titles for the Tabs in the Tab Strip
+    void refreshContent() {
+
+        if(tab1 == null){
+            Bundle bundle = new Bundle();
+            bundle.putParcelable("refreshListener", listener);
+
+            tab1 = new Tab1();
+            tab1.setArguments(bundle);
+            tab2 = new Tab2();
+            tab2.setArguments(bundle);
+        }
+
+
+        tab1.adapter.clear();
+        final FragmentTransaction ft1 = manager.beginTransaction();
+        ft1.detach(tab1);
+        ft1.attach(tab1);
+        ft1.commit();
+        tab1.setRefreshing(false);
+
+        tab2.adapter.clear();
+        final FragmentTransaction ft2 = manager.beginTransaction();
+        ft2.detach(tab2);
+        ft2.attach(tab2);
+        ft2.commit();
+        tab2.setRefreshing(false);
+    }
 
     @Override
     public CharSequence getPageTitle(int position) {
-        return Titles[position];
+        return titles[position];
     }
-
-    // This method return the Number of tabs for the tabs Strip
 
     @Override
     public int getCount() {
-        return NumbOfTabs;
+        return numbOfTabs;
     }
 }

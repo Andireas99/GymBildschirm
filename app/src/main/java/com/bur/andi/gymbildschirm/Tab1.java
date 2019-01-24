@@ -1,6 +1,5 @@
 package com.bur.andi.gymbildschirm;
 
-
 import android.os.Bundle;
 import android.support.v4.app.ListFragment;
 import android.support.v4.widget.SwipeRefreshLayout;
@@ -17,9 +16,10 @@ import java.util.ArrayList;
 
 public class Tab1 extends ListFragment {
 
-    static ArrayAdapter<Spanned> adapter;
-    ListView lv;
-    public static SwipeRefreshLayout swipeContainer;
+    ArrayAdapter<Spanned> adapter;
+    private ListView lv;
+    private SwipeRefreshLayout swipeContainer;
+    private RefreshListener refreshListener;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -27,11 +27,18 @@ public class Tab1 extends ListFragment {
         View v = inflater.inflate(R.layout.tab_1, container, false);
         lv = v.findViewById(android.R.id.list);
 
+        Bundle bundle = this.getArguments();
+        if(bundle != null){
+            refreshListener = bundle.getParcelable("refreshListener");
+        } else {
+            Log.e("Gymoberwil", "leeres Bundle");
+        }
+
         swipeContainer = v.findViewById(R.id.swipeContainer);
         swipeContainer.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
             @Override
             public void onRefresh() {
-                MainActivity.runCodeTask();
+                refreshListener.refresh();
             }
         });
 
@@ -58,6 +65,10 @@ public class Tab1 extends ListFragment {
         ((ArrayAdapter) lv.getAdapter()).notifyDataSetChanged();
 
         Log.i("GymBildschirm", "onActivityCreated Tab1");
+    }
+
+    void setRefreshing(boolean state){
+        swipeContainer.setRefreshing(state);
     }
 
 }

@@ -1,6 +1,8 @@
 package com.bur.andi.gymbildschirm;
 
 import android.os.Bundle;
+import android.os.Parcel;
+import android.support.annotation.Nullable;
 import android.support.v4.app.ListFragment;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.text.Html;
@@ -14,23 +16,31 @@ import android.widget.ListView;
 
 import java.util.ArrayList;
 
-public class Tab2 extends ListFragment{
+public class Tab2 extends ListFragment {
 
-    static ArrayAdapter<Spanned> adapter;
-    ListView lv;
-    public static SwipeRefreshLayout swipeContainer;
+    ArrayAdapter<Spanned> adapter;
+    private ListView lv;
+    private SwipeRefreshLayout swipeContainer;
+    private RefreshListener refreshListener;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 
         View v = inflater.inflate(R.layout.tab_2, container, false);
-        lv = (ListView)v.findViewById(android.R.id.list);
+        lv = v.findViewById(android.R.id.list);
 
-        swipeContainer = (SwipeRefreshLayout) v.findViewById(R.id.swipeContainer);
+        Bundle bundle = this.getArguments();
+        if(bundle != null){
+            refreshListener = bundle.getParcelable("refreshListener");
+        } else {
+            Log.e("Gymoberwil", "leeres Bundle");
+        }
+
+        swipeContainer = v.findViewById(R.id.swipeContainer);
         swipeContainer.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
             @Override
             public void onRefresh() {
-                MainActivity.runCodeTask();
+                refreshListener.refresh();
             }
         });
 
@@ -45,17 +55,22 @@ public class Tab2 extends ListFragment{
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
+
         ArrayList<Spanned> as = new ArrayList<>();
 
-        for(int i = 0; i < MainActivity.logList.size(); i++){
+        for (int i = 0; i < MainActivity.logList.size(); i++) {
             as.add(Html.fromHtml(MainActivity.logList.get(i).toString()));
         }
 
         adapter = new ArrayAdapter<>(lv.getContext(), android.R.layout.simple_list_item_1, as);
         lv.setAdapter(adapter);
-        ((ArrayAdapter)lv.getAdapter()).notifyDataSetChanged();
+        ((ArrayAdapter) lv.getAdapter()).notifyDataSetChanged();
 
-        Log.i("Info","onActivityCreated Tab2");
+        Log.i("Info", "onActivityCreated Tab2");
+    }
+
+    void setRefreshing(boolean state){
+        swipeContainer.setRefreshing(state);
     }
 
 }

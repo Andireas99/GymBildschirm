@@ -1,6 +1,6 @@
 package com.bur.andi.gymbildschirm;
 
-import android.app.Activity;
+import android.annotation.SuppressLint;
 import android.app.AlarmManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -9,7 +9,8 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.v4.app.FragmentTransaction;
+import android.os.Handler;
+import android.os.Parcel;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.NotificationCompat.Builder;
 import android.support.v4.content.ContextCompat;
@@ -34,7 +35,8 @@ import java.util.Collections;
 import java.util.Random;
 
 
-public class MainActivity extends AppCompatActivity implements CodeTaskDone {
+@SuppressLint("ParcelCreator")
+public class MainActivity extends AppCompatActivity implements ServiceResultReceiver.Receiver, RefreshListener {
 
     Toolbar toolbar;
     ViewPager pager;
@@ -50,7 +52,7 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
     public static ArrayList messagesList;
     public static ArrayList logList;
 
-    public static CodeTaskDone codeTaskDoneListener;
+    private ServiceResultReceiver mServiceResultReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,13 +60,15 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
         setContentView(R.layout.activity_main);
         Log.i("Info", "OnCreate");
 
-        messagesList = new ArrayList() {};
-        logList = new ArrayList() {};
+        messagesList = new ArrayList() {
+        };
+        logList = new ArrayList() {
+        };
 
         toolbar = findViewById(R.id.tool_bar);
         setSupportActionBar(toolbar);
 
-        viewAdapter = new ViewPagerAdapter(getSupportFragmentManager(), tabsTitles, tabsTitles.length);
+        viewAdapter = new ViewPagerAdapter(getSupportFragmentManager(), this, tabsTitles, tabsTitles.length);
 
         pager = findViewById(R.id.pager);
         pager.setAdapter(viewAdapter);
@@ -83,12 +87,12 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
 
         mContext = getApplicationContext();
 
-        Activity activity = this;
-        codeTaskDoneListener = (CodeTaskDone) activity;
+        mServiceResultReceiver = new ServiceResultReceiver(new Handler());
+        mServiceResultReceiver.setReceiver(this);
 
         startBootReceiver();
 
-        runCodeTask();
+        MyService.start(getApplicationContext(), mServiceResultReceiver);
     }
 
     @Override
@@ -122,7 +126,7 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
         manager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), pendingIntent);
     }
 
-    public void split(String ganzerCode) {
+    public String[][] getDaten(String ganzerCode) {
         Log.i("Info", "split");
 
         if (ganzerCode == null) {
@@ -134,7 +138,7 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
                 Log.i("GymBildschirm", message);
                 messagesList.add(getMessageString(message));
             }
-            return;
+            return null;
         }
 
         String[] codes;
@@ -168,7 +172,7 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
             bb = 0;
         }
 
-        checkForNew(daten);
+        return daten;
 
     }
 
@@ -223,8 +227,6 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
         } else {
             Log.i("Info", "no new messages");
         }
-        addMessageToTab();
-
 
     }
 
@@ -302,20 +304,7 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
         logList.clear();
         Collections.addAll(logList, readLog(false));
 
-        Tab1.adapter.clear();
-        final FragmentTransaction ft1 = getSupportFragmentManager().beginTransaction();
-        ft1.detach(ViewPagerAdapter.tab1);
-        ft1.attach(ViewPagerAdapter.tab1);
-        ft1.commit();
-        Tab1.swipeContainer.setRefreshing(false);
-
-
-        Tab2.adapter.clear();
-        final FragmentTransaction ft2 = getSupportFragmentManager().beginTransaction();
-        ft2.detach(ViewPagerAdapter.tab2);
-        ft2.attach(ViewPagerAdapter.tab2);
-        ft2.commit();
-        Tab2.swipeContainer.setRefreshing(false);
+        viewAdapter.refreshContent();
     }
 
     private String[] readFile() {
@@ -422,12 +411,11 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
         try {
             out = new OutputStreamWriter(this.openFileOutput(CURRENT_MESSAGES_PATH, Context.MODE_PRIVATE));
 
-            String output = "";
+            StringBuilder output = new StringBuilder();
             for (String message : messages) {
-                output = output + message + "\n";
-
+                output.append(message).append("\n");
             }
-            out.write(output);
+            out.write(output.toString());
 
         } catch (IOException ignored) {
         } finally {
@@ -481,7 +469,7 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
 
         NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
-        NotificationChannel mChannel = new NotificationChannel(id, "Gymbildschirm Channel",NotificationManager.IMPORTANCE_DEFAULT);
+        NotificationChannel mChannel = new NotificationChannel(id, "Gymbildschirm Channel", NotificationManager.IMPORTANCE_DEFAULT);
         mChannel.enableLights(true);
 
         notificationManager.createNotificationChannel(mChannel);
@@ -501,19 +489,30 @@ public class MainActivity extends AppCompatActivity implements CodeTaskDone {
         notificationManager.notify(m, notification);
     }
 
-    public static void runCodeTask() {
-        new CodeTask(new CodeTaskDone() {
-            @Override
-            public void codeTaskDone(String output) {
-                codeTaskDoneListener.codeTaskDone(output);
-            }
-        }, mContext).execute("");
+    @Override
+    public void refresh() {
+        MyService.start(getApplicationContext(), mServiceResultReceiver);
     }
 
     @Override
-    public void codeTaskDone(String output) {
-        Log.i("Info", "codeTaskDone");
-        split(output);
+    public void onReceiveResult(int resultCode, Bundle resultData) {
+        if (resultCode == 1) {
+            String[][] daten = getDaten(resultData.getString("code"));
+            checkForNew(daten);
+            addMessageToTab();
+        } else {
+            String[][] daten = getDaten(resultData.getString("code"));
+            checkForNew(daten);
+        }
     }
 
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+
+    }
 }

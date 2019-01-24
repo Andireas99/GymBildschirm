@@ -1,7 +1,5 @@
 package com.bur.andi.gymbildschirm;
 
-import android.app.AlarmManager;
-import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -14,7 +12,8 @@ public class ReceiverBoot extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.i("Gymbildschirm", "ReceiverBoot.onReceive");
+        Log.i("Gymbildschirm", "ReceiverBoot.onReceive " + intent.getAction());
+
         JobUtil.scheduleJob(context);
 
     }
