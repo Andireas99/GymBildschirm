@@ -19,7 +19,6 @@ public class Tab1 extends ListFragment {
     ArrayAdapter<Spanned> adapter;
     private ListView lv;
     private SwipeRefreshLayout swipeContainer;
-    private RefreshListener refreshListener;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -27,18 +26,11 @@ public class Tab1 extends ListFragment {
         View v = inflater.inflate(R.layout.tab_1, container, false);
         lv = v.findViewById(android.R.id.list);
 
-        Bundle bundle = this.getArguments();
-        if(bundle != null){
-            refreshListener = bundle.getParcelable("refreshListener");
-        } else {
-            Log.e("Gymoberwil", "leeres Bundle");
-        }
-
         swipeContainer = v.findViewById(R.id.swipeContainer);
         swipeContainer.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
             @Override
             public void onRefresh() {
-                refreshListener.refresh();
+                MyService.start(getActivity());
             }
         });
 

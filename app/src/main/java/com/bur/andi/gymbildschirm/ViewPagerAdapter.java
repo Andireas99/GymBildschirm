@@ -20,13 +20,11 @@ public class ViewPagerAdapter extends FragmentStatePagerAdapter {
     private int numbOfTabs;
 
     private FragmentManager manager;
-    private RefreshListener listener;
 
-    ViewPagerAdapter(FragmentManager fm, RefreshListener listener, CharSequence mTitles[], int mNumbOfTabs) {
+    ViewPagerAdapter(FragmentManager fm, CharSequence mTitles[], int mNumbOfTabs) {
         super(fm);
 
         manager = fm;
-        this.listener = listener;
         this.titles = mTitles;
         this.numbOfTabs = mNumbOfTabs;
     }
@@ -34,34 +32,18 @@ public class ViewPagerAdapter extends FragmentStatePagerAdapter {
     @Override
     public Fragment getItem(int position) {
 
-        Bundle bundle = new Bundle();
-        bundle.putParcelable("refreshListener", listener);
-
         if (position == 0) {
             Log.i("Info", "ViewPagerAdapter Tab1");
             tab1 = new Tab1();
-            tab1.setArguments(bundle);
             return tab1;
         } else {
             Log.i("Info", "ViewPagerAdapter Tab2");
             tab2 = new Tab2();
-            tab2.setArguments(bundle);
             return tab2;
         }
     }
 
     void refreshContent() {
-
-        if(tab1 == null){
-            Bundle bundle = new Bundle();
-            bundle.putParcelable("refreshListener", listener);
-
-            tab1 = new Tab1();
-            tab1.setArguments(bundle);
-            tab2 = new Tab2();
-            tab2.setArguments(bundle);
-        }
-
 
         tab1.adapter.clear();
         final FragmentTransaction ft1 = manager.beginTransaction();

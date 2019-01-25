@@ -15,7 +15,6 @@ public class ReceiverBoot extends BroadcastReceiver {
         Log.i("Gymbildschirm", "ReceiverBoot.onReceive " + intent.getAction());
 
         JobUtil.scheduleJob(context);
-
     }
 
 }
