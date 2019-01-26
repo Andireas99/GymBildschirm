@@ -32,7 +32,7 @@ class SlidingTabStrip extends LinearLayout {
         this(context, null);
     }
 
-    SlidingTabStrip(Context context, AttributeSet attrs) {
+    private SlidingTabStrip(Context context, AttributeSet attrs) {
         super(context, attrs);
         setWillNotDraw(false);
 
@@ -40,7 +40,7 @@ class SlidingTabStrip extends LinearLayout {
 
         TypedValue outValue = new TypedValue();
         context.getTheme().resolveAttribute(android.R.attr.colorForeground, outValue, true);
-        final int themeForegroundColor =  outValue.data;
+        final int themeForegroundColor = outValue.data;
 
         int defaultBottomBorderColor = setColorAlpha(themeForegroundColor,
                 DEFAULT_BOTTOM_BORDER_COLOR_ALPHA);
@@ -114,7 +114,7 @@ class SlidingTabStrip extends LinearLayout {
     }
 
     /**
-     * Set the alpha value of the {@co          de color} to be the given {@code alpha} value.
+     * Set the alpha value of the {@code color} to be the given {@code alpha} value.
      */
     private static int setColorAlpha(int color, byte alpha) {
         return Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color));

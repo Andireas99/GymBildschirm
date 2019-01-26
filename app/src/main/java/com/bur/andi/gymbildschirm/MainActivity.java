@@ -1,18 +1,10 @@
 package com.bur.andi.gymbildschirm;
 
-import android.annotation.SuppressLint;
 import android.app.AlarmManager;
-import android.app.Notification;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Parcel;
-import android.support.v4.app.NotificationCompat;
-import android.support.v4.app.NotificationCompat.Builder;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
@@ -22,55 +14,29 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collections;
 import java.util.Observable;
 import java.util.Observer;
-import java.util.Random;
 
 
-@SuppressLint("ParcelCreator")
 public class MainActivity extends AppCompatActivity implements Observer {
 
-    Toolbar toolbar;
-    ViewPager pager;
-    ViewPagerAdapter viewAdapter;
-    SlidingTabLayout tabs;
-    CharSequence tabsTitles[] = {"Nachrichten", "Log"};
-
-    public static ArrayList<String> messagesList;
-    public static ArrayList<String> logList;
+    private ViewPagerAdapter viewAdapter;
+    private final CharSequence tabsTitles[] = {"Nachrichten", "Log"};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        Log.i("Info", "OnCreate");
 
-        messagesList = new ArrayList<String>() {
-        };
-        logList = new ArrayList<String>() {
-        };
-
-
-        toolbar = findViewById(R.id.tool_bar);
+        Toolbar toolbar = findViewById(R.id.tool_bar);
         setSupportActionBar(toolbar);
 
         viewAdapter = new ViewPagerAdapter(getSupportFragmentManager(), tabsTitles, tabsTitles.length);
 
-        pager = findViewById(R.id.pager);
+        ViewPager pager = findViewById(R.id.pager);
         pager.setAdapter(viewAdapter);
 
-        tabs = findViewById(R.id.tabs);
+        SlidingTabLayout tabs = findViewById(R.id.tabs);
         tabs.setDistributeEvenly(true);
 
         tabs.setCustomTabColorizer(new SlidingTabLayout.TabColorizer() {
@@ -81,7 +47,6 @@ public class MainActivity extends AppCompatActivity implements Observer {
         });
 
         tabs.setViewPager(pager);
-
 
         ServiceObserver.getInstance().addObserver(this);
 
@@ -111,7 +76,7 @@ public class MainActivity extends AppCompatActivity implements Observer {
         return super.onOptionsItemSelected(item);
     }
 
-    public void startBootReceiver() {
+    private void startBootReceiver() {
         Log.i("Info", "startBootReceiver");
 
         Intent bootReceiverIntent = new Intent(this, ReceiverBoot.class);
@@ -121,23 +86,15 @@ public class MainActivity extends AppCompatActivity implements Observer {
         manager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), pendingIntent);
     }
 
-    public void addMessageToTab() {
+    @Override
+    public void update(Observable o, final Object arg) {
 
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                viewAdapter.refreshContent();
+                viewAdapter.refreshContent((Bundle) arg);
             }
         });
-    }
 
-    @Override
-    public void update(Observable o, Object arg) {
-        Bundle bundle = (Bundle) arg;
-
-        messagesList = bundle.getStringArrayList("messages");
-        logList = new ArrayList<>(Arrays.asList(bundle.getStringArray("log")));
-
-        addMessageToTab();
     }
 }

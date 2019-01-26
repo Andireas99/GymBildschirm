@@ -13,8 +13,9 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
 import java.util.ArrayList;
+import java.util.Objects;
 
-public class Tab1 extends ListFragment {
+public class Tab extends ListFragment {
 
     ArrayAdapter<Spanned> adapter;
     private ListView lv;
@@ -23,7 +24,7 @@ public class Tab1 extends ListFragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
 
-        View v = inflater.inflate(R.layout.tab_1, container, false);
+        View v = inflater.inflate(R.layout.tab, container, false);
         lv = v.findViewById(android.R.id.list);
 
         swipeContainer = v.findViewById(R.id.swipeContainer);
@@ -46,10 +47,15 @@ public class Tab1 extends ListFragment {
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
+        ArrayList<String> entries;
         ArrayList<Spanned> as = new ArrayList<>();
 
-        for (int i = 0; i < MainActivity.messagesList.size(); i++) {
-            as.add(Html.fromHtml(MainActivity.messagesList.get(i).toString()));
+        if (getArguments() != null) {
+            entries = getArguments().getStringArrayList("entries");
+
+            for (int i = 0; i < Objects.requireNonNull(entries).size(); i++) {
+                as.add(Html.fromHtml(entries.get(i), Html.FROM_HTML_MODE_COMPACT));
+            }
         }
 
         adapter = new ArrayAdapter<>(lv.getContext(), android.R.layout.simple_list_item_1, as);
@@ -59,8 +65,8 @@ public class Tab1 extends ListFragment {
         Log.i("GymBildschirm", "onActivityCreated Tab1");
     }
 
-    void setRefreshing(boolean state){
-        swipeContainer.setRefreshing(state);
+    void stopRefreshing(){
+        swipeContainer.setRefreshing(false);
     }
 
 }
