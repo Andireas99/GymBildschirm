@@ -40,8 +40,6 @@ public class MyService extends JobIntentService {
     private final String CURRENT_MESSAGES_PATH = "Old_Messages.txt";
     private final String LOG_MESSAGES_PATH = "Log_Messages.txt";
 
-    private static ArrayList<String> messagesList;
-
     public static void start(Context context) {
         Intent starter = new Intent(context, MyService.class);
         starter.setAction("1");
@@ -56,19 +54,25 @@ public class MyService extends JobIntentService {
 
     @Override
     protected void onHandleWork(@NonNull Intent intent) {
-        Log.i("Gymbildschirm", "MyService.onHandleWork");
-
-        messagesList = new ArrayList<String>() {
-        };
 
         try {
             String out = new WebsiteFetcher(this).execute("").get();
 
             if (Objects.equals(intent.getAction(), "1")) {
                 String[][] daten = getDaten(out);
-                checkForNew(Objects.requireNonNull(daten));
+                ArrayList<String> currentMessages = new ArrayList<>();
+                if(daten == null){
+                    String[] messages = readFile();
+                    for (String message : messages) {
+                        Log.i("GymBildschirm", message);
+                        currentMessages.add(getMessageString(message));
+                    }
+                }else{
+                    currentMessages = checkForNew(Objects.requireNonNull(daten));
+                }
+
                 Bundle bundle = new Bundle();
-                bundle.putStringArrayList("messages", messagesList);
+                bundle.putStringArrayList("messages", currentMessages);
                 bundle.putStringArrayList("logs", readLog(false));
                 ServiceObserver.getInstance().addMessagesToTab(bundle);
             } else {
@@ -86,17 +90,8 @@ public class MyService extends JobIntentService {
     }
 
     private String[][] getDaten(String ganzerCode) {
-        Log.i("Info", "split");
 
         if (ganzerCode == null) {
-            String[] messages = readFile();
-            if (messagesList != null) {
-                messagesList.clear();
-            }
-            for (String message : messages) {
-                Log.i("GymBildschirm", message);
-                messagesList.add(getMessageString(message));
-            }
             return null;
         }
 
@@ -135,14 +130,14 @@ public class MyService extends JobIntentService {
 
     }
 
-    private void checkForNew(String[][] daten) {
+    private ArrayList<String> checkForNew(String[][] daten) {
         String[] oldMessages = readFile();
         String[] messages = new String[daten.length];
 
         ArrayList<String> newMessages = new ArrayList<>();
+        ArrayList<String> messagesOut = new ArrayList<>();
         boolean newMessage = true;
         int a, b;
-        messagesList.clear();
 
         int l = daten.length - 1;
         for (int i = 0; i < daten.length; i++) {
@@ -150,6 +145,7 @@ public class MyService extends JobIntentService {
                     + daten[l - i][5]).replaceAll("\\n", "");
 
         }
+
         writeFile(CURRENT_MESSAGES_PATH, messages);
         if (oldMessages.length > 0) {
             for (a = 0; a < daten.length; a++) {
@@ -172,19 +168,17 @@ public class MyService extends JobIntentService {
         }
 
         for (String message : messages) {
-            messagesList.add(getMessageString(message));
+            messagesOut.add(getMessageString(message));
         }
 
         if (newMessages.size() > 0) {
-            appendToLogFile(newMessages);
             for (int i = 0; i < newMessages.size(); i++) {
                 showNotification(newMessages.get(i));
             }
-
-        } else {
-            Log.i("Info", "no new messages");
+            appendToLogFile(newMessages);
         }
 
+        return messagesOut;
     }
 
     private static String[] formatToParts(String input) {
@@ -197,17 +191,17 @@ public class MyService extends JobIntentService {
 
         if (!daten[0].isEmpty() && !daten[1].isEmpty()) {
             datum = "DATUM: Vom " + daten[0] + " bis zum " + daten[1] + " ";
-        } else if (!daten[0].isEmpty() && daten[1].isEmpty()) {
+        } else if (!daten[0].isEmpty()) {
             datum = "DATUM: Am " + daten[0] + " ";
-        } else if (daten[0].isEmpty() && !daten[1].isEmpty()) {
+        } else if (daten[1].isEmpty()) {
             datum = "DATUM: Bis am " + daten[1] + " ";
         }
 
         if (!daten[2].isEmpty() && !daten[3].isEmpty()) {
             zeit = "ZEIT: Von " + daten[2] + " bis " + daten[3] + " ";
-        } else if (!daten[2].isEmpty() && daten[3].isEmpty()) {
+        } else if (!daten[2].isEmpty()) {
             zeit = "ZEIT: Um " + daten[2] + " ";
-        } else if (daten[2].isEmpty() && !daten[3].isEmpty()) {
+        } else if (!daten[3].isEmpty()) {
             zeit = "ZEIT: Bis um " + daten[3] + " ";
         }
 
@@ -234,17 +228,17 @@ public class MyService extends JobIntentService {
 
         if (!daten[0].isEmpty() && !daten[1].isEmpty()) {
             datum = "<b>DATUM:</b> Vom " + daten[0] + " bis zum " + daten[1] + " ";
-        } else if (!daten[0].isEmpty() && daten[1].isEmpty()) {
+        } else if (!daten[0].isEmpty()) {
             datum = "<b>DATUM:</b> Am " + daten[0] + " ";
-        } else if (daten[0].isEmpty() && !daten[1].isEmpty()) {
+        } else if (!daten[1].isEmpty()) {
             datum = "<b>DATUM:</b> Bis am " + daten[1] + " ";
         }
 
         if (!daten[2].isEmpty() && !daten[3].isEmpty()) {
             zeit = "<b>ZEIT:</b> Von " + daten[2] + " bis " + daten[3] + " ";
-        } else if (!daten[2].isEmpty() && daten[3].isEmpty()) {
+        } else if (!daten[2].isEmpty()) {
             zeit = "<b>ZEIT:</b> Um " + daten[2] + " ";
-        } else if (daten[2].isEmpty() && !daten[3].isEmpty()) {
+        } else if (!daten[3].isEmpty()) {
             zeit = "<b>ZEIT:</b> Bis um " + daten[3] + " ";
         }
 
@@ -258,12 +252,11 @@ public class MyService extends JobIntentService {
     }
 
     private String[] readFile() {
-        Log.i("Info", "readFile start");
         String[] output = null;
         ArrayList<String> messagesList = new ArrayList<>();
 
         try {
-            InputStream inputStream = this.openFileInput(CURRENT_MESSAGES_PATH);
+            InputStream inputStream = openFileInput(CURRENT_MESSAGES_PATH);
 
             if (inputStream != null) {
                 InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
@@ -283,7 +276,6 @@ public class MyService extends JobIntentService {
                 for (int i = 0; i < messagesList.size(); i++) {
                     output[i] = messagesList.get(i);
                 }
-                Log.i("Info", "readfile done");
             }
         } catch (FileNotFoundException e) {
             Log.e("Error", "File not found: " + e.toString());
@@ -296,12 +288,11 @@ public class MyService extends JobIntentService {
     }
 
     private ArrayList<String> readLog(boolean returnPlain) {
-        Log.i("Info", "readLog start");
 
         ArrayList<String> logList = new ArrayList<>();
 
         try {
-            InputStream inputStream = this.openFileInput(LOG_MESSAGES_PATH);
+            InputStream inputStream = openFileInput(LOG_MESSAGES_PATH);
 
             if (inputStream != null) {
                 InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
@@ -318,22 +309,20 @@ public class MyService extends JobIntentService {
 
                 while ((receiveString = bufferedReader.readLine()) != null) {
                     if (receiveString.split("\\|").length == 2) {
-                        Log.i("Info", "logList getMessageString");
                         logList.add("<html><b>Empfangen: </b>" + receiveString.split("\\|")[0] + "<br></html>" + getMessageString(receiveString.split("\\|")[1]));
                     } else {
                         logList.add("<html><b>ERROR</b><br></html>" + receiveString);
-                        Log.e("Log Error", receiveString);
+                        Log.e("Error", "receiveString: "+receiveString);
                     }
 
                 }
                 if (logList.size() == 0) {
-                    Log.e("Error", "Keine Log Inhalt");
+                    Log.e("Error", "Kein Log Inhalt");
                     return new ArrayList<>();
                 }
 
                 inputStream.close();
 
-                Log.i("Info", "read log done");
             } else {
                 return new ArrayList<>();
             }
@@ -349,7 +338,7 @@ public class MyService extends JobIntentService {
     private void writeFile(String path, String[] messages) {
         OutputStreamWriter out = null;
         try {
-            out = new OutputStreamWriter(this.openFileOutput(path, Context.MODE_PRIVATE));
+            out = new OutputStreamWriter(openFileOutput(path, Context.MODE_PRIVATE));
 
             StringBuilder output = new StringBuilder();
             for (String message : messages) {
@@ -370,24 +359,23 @@ public class MyService extends JobIntentService {
     }
 
     private void appendToLogFile(ArrayList<String> newMessages) {
-        Log.i("Info", "appendToLogFile");
 
         Calendar cal = Calendar.getInstance();
         SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm");
         String time = sdf.format(cal.getTime());
 
-        for(int i = 0; i < newMessages.size(); i++){
-            newMessages.set(i, time + " |" +newMessages.get(i));
+        for (int i = 0; i < newMessages.size(); i++) {
+            newMessages.set(i, time + " |" + newMessages.get(i));
         }
 
-        ArrayList<String> oldMessages = readLog(true);
-        newMessages.addAll(oldMessages);
+        ArrayList<String> allLogs = new ArrayList<>(newMessages);
+        allLogs.addAll(readLog(true));
 
-        writeFile(LOG_MESSAGES_PATH, newMessages.toArray(new String[0]));
+        writeFile(LOG_MESSAGES_PATH, allLogs.toArray(new String[0]));
     }
 
     private void showNotification(String message) {
-        Intent notificationIntent = new Intent(this, MainActivity.class);
+        Intent notificationIntent = new Intent(this, MyService.class);
         PendingIntent pi = PendingIntent.getActivity(this, 0, notificationIntent, 0);
 
         String id = "gymbildschirm_channel_1";
@@ -454,7 +442,6 @@ public class MyService extends JobIntentService {
         }
 
         private String getSourceCode() throws IOException {
-            Log.i("Info", "geturl start");
             URL url = new URL("https://sal.portal.bl.ch/gymow/dview/showterminliste.php?id=6zfgfbejsdtwgv3hcuwegujdbg");
 
             HttpURLConnection response = (HttpURLConnection) url.openConnection();
@@ -468,9 +455,6 @@ public class MyService extends JobIntentService {
             }
 
             String resString = sb.toString();
-
-            is.close();
-            Log.i("Info", "geturl end");
             resString = resString.replaceAll("&nbsp;", "");
             resString = resString.replaceAll(";", " ");
             if (hasWebsiteError(resString)) {
