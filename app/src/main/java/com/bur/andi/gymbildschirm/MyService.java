@@ -27,7 +27,6 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.Objects;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
@@ -50,135 +49,6 @@ public class MyService extends JobIntentService {
         Intent starter = new Intent(context, MyService.class);
         starter.setAction("2");
         enqueueWork(context, MyService.class, 1000, starter);
-    }
-
-    @Override
-    protected void onHandleWork(@NonNull Intent intent) {
-
-        try {
-            String out = new WebsiteFetcher(this).execute("").get();
-
-            if (Objects.equals(intent.getAction(), "1")) {
-                String[][] daten = getDaten(out);
-                ArrayList<String> currentMessages = new ArrayList<>();
-                if(daten == null){
-                    String[] messages = readFile();
-                    for (String message : messages) {
-                        Log.i("GymBildschirm", message);
-                        currentMessages.add(getMessageString(message));
-                    }
-                }else{
-                    currentMessages = checkForNew(Objects.requireNonNull(daten));
-                }
-
-                Bundle bundle = new Bundle();
-                bundle.putStringArrayList("messages", currentMessages);
-                bundle.putStringArrayList("logs", readLog(false));
-                ServiceObserver.getInstance().addMessagesToTab(bundle);
-            } else {
-                String[][] daten = getDaten(out);
-                checkForNew(Objects.requireNonNull(daten));
-            }
-
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        onDestroy();
-    }
-
-    private String[][] getDaten(String ganzerCode) {
-
-        if (ganzerCode == null) {
-            return null;
-        }
-
-        String[] codes;
-        String[][] codes2;
-        String[][] daten;
-        int anzahl = 0;
-
-        codes = ganzerCode.split("<tr>|</table>");
-
-        for (int i = 0; i < codes.length - 1; i++) {
-            if (codes[i] != null) {
-                anzahl++;
-            } else {
-                break;
-            }
-        }
-
-        codes2 = new String[anzahl - 1][13];
-        for (int i = 0; i < anzahl - 1; i++) {
-            codes2[i] = codes[i + 1].split("[<>]");
-        }
-
-        daten = new String[anzahl - 1][6];
-        int bb = 0;
-
-        for (int a = 0; a < anzahl - 1; a++) {
-            for (int b = 2; bb < 6; b = b + 2) {
-                daten[a][bb] = codes2[a][b].trim();
-                bb++;
-            }
-            bb = 0;
-        }
-
-        return daten;
-
-    }
-
-    private ArrayList<String> checkForNew(String[][] daten) {
-        String[] oldMessages = readFile();
-        String[] messages = new String[daten.length];
-
-        ArrayList<String> newMessages = new ArrayList<>();
-        ArrayList<String> messagesOut = new ArrayList<>();
-        boolean newMessage = true;
-        int a, b;
-
-        int l = daten.length - 1;
-        for (int i = 0; i < daten.length; i++) {
-            messages[i] = (daten[l - i][0] + ";" + daten[l - i][1] + ";" + daten[l - i][2] + ";" + daten[l - i][3] + ";" + daten[l - i][4] + ";"
-                    + daten[l - i][5]).replaceAll("\\n", "");
-
-        }
-
-        writeFile(CURRENT_MESSAGES_PATH, messages);
-        if (oldMessages.length > 0) {
-            for (a = 0; a < daten.length; a++) {
-                for (b = 0; b < oldMessages.length; b++) {
-
-                    if (oldMessages[b].equals(messages[a])) {
-                        newMessage = false;
-                        break;
-                    }
-                }
-
-                if (newMessage) {
-                    newMessages.add(messages[a]);
-                }
-                newMessage = true;
-
-            }
-        } else {
-            Collections.addAll(newMessages, messages);
-        }
-
-        for (String message : messages) {
-            messagesOut.add(getMessageString(message));
-        }
-
-        if (newMessages.size() > 0) {
-            for (int i = 0; i < newMessages.size(); i++) {
-                showNotification(newMessages.get(i));
-            }
-            appendToLogFile(newMessages);
-        }
-
-        return messagesOut;
     }
 
     private static String[] formatToParts(String input) {
@@ -210,6 +80,115 @@ public class MyService extends JobIntentService {
         return output;
     }
 
+    @Override
+    protected void onHandleWork(@NonNull Intent intent) {
+
+        try {
+            String out = new WebsiteFetcher(this).execute("").get();
+
+            if (Objects.equals(intent.getAction(), "1")) {
+                String[][] daten = getDaten(out);
+                ArrayList<String> currentMessages = new ArrayList<>();
+                if (daten != null) {
+                    currentMessages = checkForNew(daten);
+                } else {
+                    String[] messages = readOldMessages();
+                    for (String message : messages) {
+                        currentMessages.add(getMessageString(message));
+                    }
+                }
+
+                Bundle bundle = new Bundle();
+                bundle.putStringArrayList("messages", currentMessages);
+                bundle.putStringArrayList("logs", readLog(false));
+                ServiceObserver.getInstance().addMessagesToTab(bundle);
+            } else {
+                String[][] daten = getDaten(out);
+                if (daten != null) {
+                    checkForNew(daten);
+                }
+            }
+
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        onDestroy();
+    }
+
+    private String[][] getDaten(String sourceCode) {
+
+        if (sourceCode == null) {
+            return null;
+        }
+
+        String[][] entries;
+
+        sourceCode = sourceCode.replaceFirst("(?s).*?<tr>.*?<.*?>", "")
+                .replaceFirst("(?s)\\R</table>.*", "");
+
+        String[] rawEntries = sourceCode.split("(?s)<tr>.*?<.*?>");
+
+        //Log.i("Gymbildschirm", "rawEntries: "+Arrays.toString(rawEntries));
+
+        int entryCount = rawEntries.length;
+
+        entries = new String[entryCount][];
+        for (int i = 0; i < entryCount; i++) {
+            entries[i] = rawEntries[i].split("<.*>");
+            //Log.i("Gymbildschirm", "entries "+i+": "+Arrays.toString(entries[i]));
+        }
+
+        return entries;
+
+    }
+
+    private ArrayList<String> checkForNew(String[][] daten) {
+        String[] oldMessages = readOldMessages();
+        String[] messages = new String[daten.length];
+
+        ArrayList<String> newMessages = new ArrayList<>();
+        ArrayList<String> messagesOut = new ArrayList<>();
+        boolean newMessage = true;
+
+        for (int i = 0; i < daten.length; i++) {
+            messages[i] = (daten[i][0] + ";" + daten[i][1] + ";" + daten[i][2] + ";" + daten[i][3] + ";" + daten[i][4] + ";"
+                    + daten[i][5]).replaceAll("\\R", "");
+        }
+
+        writeFile(CURRENT_MESSAGES_PATH, messages);
+
+        for (int i = 0; i < daten.length; i++) {
+            for (String oldMessage : oldMessages) {
+                if (oldMessage.equals(messages[i])) {
+                    newMessage = false;
+                    break;
+                }
+            }
+
+            if (newMessage) {
+                newMessages.add(messages[i]);
+            }
+            newMessage = true;
+
+        }
+
+        for (String message : messages) {
+            messagesOut.add(getMessageString(message));
+        }
+
+        if (newMessages.size() > 0) {
+            for (int i = 0; i < newMessages.size(); i++) {
+                showNotification(newMessages.get(i));
+            }
+            appendToLogFile(newMessages);
+        }
+
+        return messagesOut;
+    }
+
     private String getMessageString(String input) {
 
         input = input.trim();
@@ -220,7 +199,11 @@ public class MyService extends JobIntentService {
         String zeit = "";
         String betreff = "";
 
-        Log.i("Info", "input: " + input);
+        for (int i = 0; i < daten.length; i++) {
+            daten[i] = daten[i].trim();
+        }
+
+        //Log.i("Info", "input: " + input);
 
         if (!daten[4].isEmpty()) {
             betreff = "<b>BETREFF:</b> " + daten[4];
@@ -251,7 +234,7 @@ public class MyService extends JobIntentService {
         return output;
     }
 
-    private String[] readFile() {
+    private String[] readOldMessages() {
         String[] output = null;
         ArrayList<String> messagesList = new ArrayList<>();
 
@@ -312,7 +295,7 @@ public class MyService extends JobIntentService {
                         logList.add("<html><b>Empfangen: </b>" + receiveString.split("\\|")[0] + "<br></html>" + getMessageString(receiveString.split("\\|")[1]));
                     } else {
                         logList.add("<html><b>ERROR</b><br></html>" + receiveString);
-                        Log.e("Error", "receiveString: "+receiveString);
+                        Log.e("Error", "receiveString: " + receiveString);
                     }
 
                 }
@@ -403,8 +386,8 @@ public class MyService extends JobIntentService {
     }
 
     private static class WebsiteFetcher extends AsyncTask<String, Void, String> {
-        String sourceCode;
         final WeakReference<Context> contextRef;
+        String sourceCode;
 
         WebsiteFetcher(Context mContext) {
             contextRef = new WeakReference<>(mContext);
