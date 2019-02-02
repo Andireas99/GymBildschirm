@@ -26,6 +26,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Objects;
 import java.util.Random;
@@ -51,35 +52,6 @@ public class MyService extends JobIntentService {
         enqueueWork(context, MyService.class, 1000, starter);
     }
 
-    private static String[] formatToParts(String input) {
-        input = input.trim();
-        input = input.replaceAll("\\n", "").replaceAll("\\r", "");
-        String[] daten = input.split(";");
-        String output[] = new String[2];
-        String datum = "";
-        String zeit = "";
-
-        if (!daten[0].isEmpty() && !daten[1].isEmpty()) {
-            datum = "DATUM: Vom " + daten[0] + " bis zum " + daten[1] + " ";
-        } else if (!daten[0].isEmpty()) {
-            datum = "DATUM: Am " + daten[0] + " ";
-        } else if (daten[1].isEmpty()) {
-            datum = "DATUM: Bis am " + daten[1] + " ";
-        }
-
-        if (!daten[2].isEmpty() && !daten[3].isEmpty()) {
-            zeit = "ZEIT: Von " + daten[2] + " bis " + daten[3] + " ";
-        } else if (!daten[2].isEmpty()) {
-            zeit = "ZEIT: Um " + daten[2] + " ";
-        } else if (!daten[3].isEmpty()) {
-            zeit = "ZEIT: Bis um " + daten[3] + " ";
-        }
-
-        output[0] = daten[4];
-        output[1] = datum + "\r\n" + zeit + "\r\n" + daten[5];
-        return output;
-    }
-
     @Override
     protected void onHandleWork(@NonNull Intent intent) {
 
@@ -92,15 +64,15 @@ public class MyService extends JobIntentService {
                 if (daten != null) {
                     currentMessages = checkForNew(daten);
                 } else {
-                    String[] messages = readOldMessages();
+                    String[] messages = readFile(CURRENT_MESSAGES_PATH);
                     for (String message : messages) {
-                        currentMessages.add(getMessageString(message));
+                        currentMessages.add(arrayToMessage(csvToArray(message)));
                     }
                 }
 
                 Bundle bundle = new Bundle();
                 bundle.putStringArrayList("messages", currentMessages);
-                bundle.putStringArrayList("logs", readLog(false));
+                bundle.putStringArrayList("logs", readLog());
                 ServiceObserver.getInstance().addMessagesToTab(bundle);
             } else {
                 String[][] daten = getDaten(out);
@@ -131,14 +103,11 @@ public class MyService extends JobIntentService {
 
         String[] rawEntries = sourceCode.split("(?s)<tr>.*?<.*?>");
 
-        //Log.i("Gymbildschirm", "rawEntries: "+Arrays.toString(rawEntries));
-
         int entryCount = rawEntries.length;
 
         entries = new String[entryCount][];
         for (int i = 0; i < entryCount; i++) {
             entries[i] = rawEntries[i].split("<.*>");
-            //Log.i("Gymbildschirm", "entries "+i+": "+Arrays.toString(entries[i]));
         }
 
         return entries;
@@ -146,123 +115,108 @@ public class MyService extends JobIntentService {
     }
 
     private ArrayList<String> checkForNew(String[][] daten) {
-        String[] oldMessages = readOldMessages();
-        String[] messages = new String[daten.length];
+
+        String[] csvEntries = new String[daten.length];
+        ArrayList<String> oldMessages = new ArrayList<>(Arrays.asList(readFile(CURRENT_MESSAGES_PATH)));
 
         ArrayList<String> newMessages = new ArrayList<>();
-        ArrayList<String> messagesOut = new ArrayList<>();
-        boolean newMessage = true;
+        ArrayList<String> currentMessages = new ArrayList<>();
 
         for (int i = 0; i < daten.length; i++) {
-            messages[i] = (daten[i][0] + ";" + daten[i][1] + ";" + daten[i][2] + ";" + daten[i][3] + ";" + daten[i][4] + ";"
+            csvEntries[i] = (daten[i][0] + ";" + daten[i][1] + ";" + daten[i][2] + ";" + daten[i][3] + ";" + daten[i][4] + ";"
                     + daten[i][5]).replaceAll("\\R", "");
         }
 
-        writeFile(CURRENT_MESSAGES_PATH, messages);
+        writeFile(CURRENT_MESSAGES_PATH, csvEntries);
 
-        for (int i = 0; i < daten.length; i++) {
-            for (String oldMessage : oldMessages) {
-                if (oldMessage.equals(messages[i])) {
-                    newMessage = false;
-                    break;
-                }
+        for (String csvEntry : csvEntries) {
+
+            currentMessages.add(arrayToMessage(csvToArray(csvEntry)));
+            if (!oldMessages.contains(csvEntry)) {
+                newMessages.add(csvEntry);
+                showNotification(csvEntry.split(";"));
             }
-
-            if (newMessage) {
-                newMessages.add(messages[i]);
-            }
-            newMessage = true;
-
         }
 
-        for (String message : messages) {
-            messagesOut.add(getMessageString(message));
-        }
-
-        if (newMessages.size() > 0) {
-            for (int i = 0; i < newMessages.size(); i++) {
-                showNotification(newMessages.get(i));
-            }
+        if (!newMessages.isEmpty()) {
             appendToLogFile(newMessages);
         }
 
-        return messagesOut;
+        return currentMessages;
     }
 
-    private String getMessageString(String input) {
-
+    private String[] csvToArray(String input) {
         input = input.trim();
-        input = input.replaceAll("\\n", "").replaceAll("\\r", "");
-        String[] daten = input.split(";");
-        String output;
-        String datum = "";
-        String zeit = "";
+        input = input.replaceAll("\\R", "");
+
+        return input.split(";");
+    }
+
+    private String arrayToMessage(String[] fields) {
+
+        String datum = getFormattedDate(fields[0], fields[1]);
+        String zeit = getFormattedTime(fields[2], fields[3]);
         String betreff = "";
 
-        for (int i = 0; i < daten.length; i++) {
-            daten[i] = daten[i].trim();
+        if (!fields[4].isEmpty()) {
+            betreff = "<b>BETREFF:</b> " + fields[4];
         }
 
-        //Log.i("Info", "input: " + input);
-
-        if (!daten[4].isEmpty()) {
-            betreff = "<b>BETREFF:</b> " + daten[4];
-        }
-
-        if (!daten[0].isEmpty() && !daten[1].isEmpty()) {
-            datum = "<b>DATUM:</b> Vom " + daten[0] + " bis zum " + daten[1] + " ";
-        } else if (!daten[0].isEmpty()) {
-            datum = "<b>DATUM:</b> Am " + daten[0] + " ";
-        } else if (!daten[1].isEmpty()) {
-            datum = "<b>DATUM:</b> Bis am " + daten[1] + " ";
-        }
-
-        if (!daten[2].isEmpty() && !daten[3].isEmpty()) {
-            zeit = "<b>ZEIT:</b> Von " + daten[2] + " bis " + daten[3] + " ";
-        } else if (!daten[2].isEmpty()) {
-            zeit = "<b>ZEIT:</b> Um " + daten[2] + " ";
-        } else if (!daten[3].isEmpty()) {
-            zeit = "<b>ZEIT:</b> Bis um " + daten[3] + " ";
-        }
-
-        if (daten.length < 6) {
-            output = "<html>" + betreff + "<br>" + datum + "<br>" + zeit + "</html>";
-        } else {
-            output = "<html>" + betreff + "<br>" + datum + "<br>" + zeit + "<br>" + daten[5] + "</html>";
-        }
-
-        return output;
+        return "<html>" + betreff + "<br>" + datum + "<br>" + zeit + "<br>" + fields[5] + "</html>";
     }
 
-    private String[] readOldMessages() {
-        String[] output = null;
+    String getFormattedTime(String time1, String time2) {
+        time1 = time1.trim();
+        time2 = time2.trim();
+
+        String zeit = "";
+        if (!time1.isEmpty() && !time2.isEmpty()) {
+            zeit = "<b>ZEIT:</b> Von " + time1 + " bis " + time2;
+        } else if (!time1.isEmpty()) {
+            zeit = "<b>ZEIT:</b> Um " + time1;
+        } else if (!time2.isEmpty()) {
+            zeit = "<b>ZEIT:</b> Bis um " + time2;
+        }
+        return zeit;
+    }
+
+    String getFormattedDate(String date1, String date2) {
+        date1 = date1.trim();
+        date2 = date2.trim();
+
+        String datum = "";
+        if (!date1.isEmpty() && !date2.isEmpty()) {
+            datum = "<b>DATUM:</b> Vom " + date1 + " bis zum " + date2 + " ";
+        } else if (!date1.isEmpty()) {
+            datum = "<b>DATUM:</b> Am " + date1 + " ";
+        } else if (!date2.isEmpty()) {
+            datum = "<b>DATUM:</b> Bis am " + date2 + " ";
+        }
+        return datum;
+    }
+
+    private String[] readFile(String path) {
+        String[] output = new String[0];
         ArrayList<String> messagesList = new ArrayList<>();
 
-        try {
-            InputStream inputStream = openFileInput(CURRENT_MESSAGES_PATH);
-
-            if (inputStream != null) {
+        try (
+                InputStream inputStream = openFileInput(path);
                 InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
-                BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-                String receiveString;
+                BufferedReader bufferedReader = new BufferedReader(inputStreamReader)
+        ) {
 
-                while ((receiveString = bufferedReader.readLine()) != null) {
-                    messagesList.add(receiveString);
-                }
-                if (messagesList.size() == 0) {
-                    return new String[]{};
-                }
-
-                inputStream.close();
-
-                output = new String[messagesList.size()];
-                for (int i = 0; i < messagesList.size(); i++) {
-                    output[i] = messagesList.get(i);
-                }
+            String curLine;
+            while ((curLine = bufferedReader.readLine()) != null) {
+                messagesList.add(curLine);
             }
+
+            output = new String[messagesList.size()];
+            for (int i = 0; i < messagesList.size(); i++) {
+                output[i] = messagesList.get(i);
+            }
+
         } catch (FileNotFoundException e) {
             Log.e("Error", "File not found: " + e.toString());
-            output = new String[]{};
         } catch (IOException e) {
             Log.e("Error", "Can not read file: " + e.toString());
         }
@@ -270,51 +224,17 @@ public class MyService extends JobIntentService {
         return output;
     }
 
-    private ArrayList<String> readLog(boolean returnPlain) {
+    private ArrayList<String> readLog() {
+
+        String[] entries = readFile(LOG_MESSAGES_PATH);
 
         ArrayList<String> logList = new ArrayList<>();
 
-        try {
-            InputStream inputStream = openFileInput(LOG_MESSAGES_PATH);
-
-            if (inputStream != null) {
-                InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
-                BufferedReader bufferedReader = new BufferedReader(inputStreamReader);
-                String receiveString;
-
-                if (returnPlain) {
-                    ArrayList<String> plainList = new ArrayList<>();
-                    while ((receiveString = bufferedReader.readLine()) != null) {
-                        plainList.add(receiveString.replaceAll("&nbsp ", ""));
-                    }
-                    return plainList;
-                }
-
-                while ((receiveString = bufferedReader.readLine()) != null) {
-                    if (receiveString.split("\\|").length == 2) {
-                        logList.add("<html><b>Empfangen: </b>" + receiveString.split("\\|")[0] + "<br></html>" + getMessageString(receiveString.split("\\|")[1]));
-                    } else {
-                        logList.add("<html><b>ERROR</b><br></html>" + receiveString);
-                        Log.e("Error", "receiveString: " + receiveString);
-                    }
-
-                }
-                if (logList.size() == 0) {
-                    Log.e("Error", "Kein Log Inhalt");
-                    return new ArrayList<>();
-                }
-
-                inputStream.close();
-
-            } else {
-                return new ArrayList<>();
-            }
-        } catch (FileNotFoundException e) {
-            Log.e("Error", "File not found: " + e.toString());
-            logList = new ArrayList<>();
-        } catch (IOException e) {
-            Log.e("Error", "Can not read file: " + e.toString());
+        for (String entry : entries) {
+            logList.add("<html><b>EMPFANGEN: </b>" + entry.split("\\|")[0] + "<br></html>"
+                    + arrayToMessage(csvToArray(entry.replaceFirst(".*\\|", ""))));
         }
+
         return logList;
     }
 
@@ -348,16 +268,25 @@ public class MyService extends JobIntentService {
         String time = sdf.format(cal.getTime());
 
         for (int i = 0; i < newMessages.size(); i++) {
-            newMessages.set(i, time + " |" + newMessages.get(i));
+            newMessages.set(i, time + "|" + newMessages.get(i));
         }
 
         ArrayList<String> allLogs = new ArrayList<>(newMessages);
-        allLogs.addAll(readLog(true));
+        allLogs.addAll(Arrays.asList(readFile(LOG_MESSAGES_PATH)));
 
         writeFile(LOG_MESSAGES_PATH, allLogs.toArray(new String[0]));
     }
 
-    private void showNotification(String message) {
+
+    private String[] formatNotification(String[] daten) {
+
+        String datum = getFormattedDate(daten[0], daten[1]).replaceAll("</?b>", "");
+        String zeit = getFormattedTime(daten[2], daten[3]).replaceAll("</?b>", "");
+
+        return new String[]{daten[4], datum + "\n" + zeit + "\n" + daten[5]};
+    }
+
+    private void showNotification(String[] daten) {
         Intent notificationIntent = new Intent(this, MyService.class);
         PendingIntent pi = PendingIntent.getActivity(this, 0, notificationIntent, 0);
 
@@ -370,12 +299,14 @@ public class MyService extends JobIntentService {
 
         notificationManager.createNotificationChannel(mChannel);
 
+        String[] messageParts = formatNotification(daten);
+
         Notification notification = new NotificationCompat.Builder(getApplicationContext(), id)
                 .setTicker("Neue Nachricht")
                 .setSmallIcon(android.R.drawable.ic_menu_report_image)
-                .setContentTitle(formatToParts(message)[0])
+                .setContentTitle(messageParts[0])
                 .setContentIntent(pi)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(formatToParts(message)[0] + "\n" + formatToParts(message)[1]))
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(messageParts[1]))
                 .setAutoCancel(true)
                 .build();
 
